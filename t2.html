@@ -1,0 +1,478 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FXVision Bot (Floating Overlay)</title>
+    <style>
+        /* --- CSS Styling --- */
+        @import url('https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;700&display=swap');
+
+        body {
+            margin: 0;
+            padding: 0;
+            /* Make background transparent for Electron Floating Window */
+            background-color: transparent; 
+            font-family: 'Rajdhani', sans-serif;
+            height: 100vh;
+            overflow: hidden;
+            display: flex;
+            justify-content: center; /* Center initially, though JS handles dragging */
+            align-items: center;
+            pointer-events: none;
+        }
+
+        /* --- Bot Container (Merged Features) --- */
+        /* --- 1. CONTAINER: Isse Bot Move karega --- */
+        #bot-container {
+            width: 320px;
+            height: 580px;
+            margin: auto;  /* Center mein rakhne ke liye */
+
+            /* Ye line SABSE ZARURI hai move karne ke liye */
+            -webkit-app-region: drag;
+
+            /* Baki Design Styles */
+            background: rgba(13, 22, 38, 0.95);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(0, 229, 255, 0.3);
+            border-radius: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+            box-sizing: border-box;
+            box-shadow: 0 0 20px rgba(0, 229, 255, 0.1);
+            transition: all 0.3s ease; /* Smooth transition for container changes */
+            pointer-events: auto;
+        }
+
+        /* --- 2. BUTTONS: Isse Click kaam karega --- */
+        /* In sab par se Drag hata diya taaki click ho sake */
+        .currency-box, 
+        .currency-dropdown, 
+        .currency-option,
+        .gauge-wrapper, 
+        .action-btn, 
+        .logo-area {
+            -webkit-app-region: no-drag;
+            cursor: pointer;
+        }
+
+        /* --- Header & Logo --- */
+        .header {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            width: 100%;
+            margin-bottom: 20px;
+
+            /* Dragging Logic */
+            -webkit-app-region: drag;
+            cursor: move;
+
+            /* IMPORTANT FIX: Click-through issue solve karne ke liye */
+            background: rgba(255, 255, 255, 0.01); /* Invisible solid layer */
+            position: relative;
+            z-index: 9999;
+        }
+
+        .logo-area {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            cursor: grab;
+        }
+
+        .logo-area img {
+            width: 35px;
+            height: 35px;
+            pointer-events: none;
+            /* Coding 2 Feature: Logo Glow */
+            filter: drop-shadow(0 0 5px #00e5ff);
+        }
+
+        .logo-text {
+            color: #00e5ff;
+            font-size: 1.4rem;
+            font-weight: bold;
+            letter-spacing: 1px;
+            /* Coding 2 Feature: Text Neon Glow */
+            text-shadow: 0 0 10px rgba(0, 229, 255, 0.8),
+                         0 0 20px rgba(0, 229, 255, 0.4);
+        }
+
+        .user-email {
+            background: rgba(15, 25, 38, 0.8);
+            padding: 5px 15px;
+            border-radius: 5px;
+            font-size: 0.8rem;
+            color: #7a8b9e;
+            margin-top: 10px;
+            border: 1px solid rgba(31, 42, 61, 0.8);
+            width: 80%;
+            text-align: center;
+        }
+
+        /* --- Currency Switcher & Dropdown --- */
+        .currency-box {
+            /* --- PURANA DESIGN (DO NOT DELETE) --- */
+            background: linear-gradient(90deg, rgba(11, 21, 33, 0.9), rgba(19, 32, 48, 0.9));
+            border: 1px solid #00e5ff;
+            padding: 10px 15px;
+            border-radius: 12px;
+            width: 80%;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 30px;
+            cursor: pointer;
+
+            /* Intense Neon Box Shadow */
+            box-shadow: 0 0 15px rgba(0, 229, 255, 0.4),
+                        inset 0 0 10px rgba(0, 229, 255, 0.1);
+            transition: all 0.3s;
+
+            /* --- NAYA FEATURE (Zaruri hai) --- */
+            position: relative; /* Ye dropdown ko sahi jagah dikhane ke liye chahiye */
+            z-index: 200; /* ensure dropdown stacks above other UI */
+        }
+
+        /* --- NEW: Text Glow ke liye CSS --- */
+        /* --- NEW: Text Glow ke liye CSS (UPDATED SIZE) --- */
+        #current-pair {
+            font-weight: 800;        /* Thoda aur heavy font weight */
+            font-size: 1.4rem;       /* SIZE BADHAYA: 1.1em se 1.8rem kar diya */
+            letter-spacing: 1px;     /* Thoda gap taaki glow aapas mein chipke nahi */
+            color: #00e5ff;          /* Default Neon Blue Color */
+
+            /* Default Neon Blue Glow */
+            text-shadow: 0 0 10px rgba(0, 229, 255, 0.9),
+                         0 0 20px rgba(0, 229, 255, 0.7),
+                         0 0 40px rgba(0, 229, 255, 0.5); /* Glow spread bhi badhaya */
+
+            transition: all 0.3s ease;
+        }
+        /* ---------------------------------- */
+
+        /* Dropdown List (Naya Code) */
+        .currency-dropdown {
+            position: absolute;
+            top: 110%; /* Box ke thoda neeche */
+            left: 0;
+            width: 100%;
+            background: rgba(13, 22, 38, 0.98); /* Dark Background */
+            border: 1px solid rgba(0, 229, 255, 0.3);
+            border-radius: 15px;
+            padding: 10px 0;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+            z-index: 300;
+
+            /* Animation: Hidden */
+            opacity: 0;
+            visibility: hidden;
+            transform: translateY(-10px);
+            transition: all 0.3s ease;
+        }
+
+        /* Jab List Open hogi */
+        .currency-dropdown.open {
+            opacity: 1;
+            visibility: visible;
+            transform: translateY(0);
+        }
+
+        /* Individual Options */
+        .currency-option {
+            padding: 10px 20px;
+            color: #888;
+            font-family: 'Rajdhani', sans-serif;
+            font-weight: 600;
+            transition: 0.2s;
+        }
+
+        .currency-option:hover {
+            background: rgba(0, 229, 255, 0.1);
+            color: #fff;
+            padding-left: 25px;
+            text-shadow: 0 0 10px #00e5ff;
+        }
+
+        .currency-box:hover {
+            box-shadow: 0 0 25px rgba(0, 229, 255, 0.6),
+                        inset 0 0 15px rgba(0, 229, 255, 0.2);
+        }
+
+        .status-dot {
+            height: 8px;
+            width: 8px;
+            background-color: #00ff41;
+            border-radius: 50%;
+            /* Green Dot Glow */
+            box-shadow: 0 0 8px #00ff41, 0 0 15px #00ff41;
+            transition: all 0.3s ease;
+        }
+
+        /* --- Central Gauge (Electron/Radar) --- */
+        .gauge-wrapper {
+            position: relative;
+            width: 180px;
+            height: 180px;
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+            z-index: 50; /* keep gauge below dropdown */
+        }
+
+        .gauge-track {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            border: 2px dashed rgba(51, 68, 85, 0.5);
+            box-sizing: border-box;
+        }
+
+        /* The Radar Sweep Animation */
+        .radar-sweep {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            /* Coding 2 Feature: Stronger Gradient */
+            background: conic-gradient(from 0deg, transparent 0%, rgba(0, 229, 255, 0.0) 60%, rgba(0, 229, 255, 0.8) 100%);
+            mask: radial-gradient(transparent 60%, black 61%);
+            -webkit-mask: radial-gradient(transparent 60%, black 61%);
+            opacity: 0;
+            transition: opacity 0.5s;
+            /* Glow on the radar beam itself */
+            filter: drop-shadow(0 0 5px #00e5ff);
+        }
+
+        .radar-sweep.active {
+            opacity: 1;
+            animation: rotateRadar 2s linear infinite;
+        }
+
+        /* Inner Content */
+        .gauge-inner {
+            position: relative;
+            z-index: 2;
+            text-align: center;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            width: 110px;
+            height: 110px;
+            background: #0d1626;
+            border-radius: 50%;
+            /* Deep inner shadow */
+            box-shadow: inset 0 0 30px rgba(0,0,0,0.9);
+            border: 1px solid rgba(255,255,255,0.05);
+        }
+
+        .gauge-img {
+            width: 65px;            /* Size bada kiya */
+            opacity: 1;             /* Full visible */
+            margin-bottom: 0px;
+            filter: drop-shadow(0 0 8px #00e5ff); /* Glow effect */
+        }
+
+        .percentage {
+            font-size: 1.8rem;
+            font-weight: bold;
+            color: #00e5ff;
+            /* Coding 2 Feature: Number Glow */
+            text-shadow: 0 0 15px rgba(0, 229, 255, 0.8);
+        }
+        /* Gauge ke andar wala chhota text (EUR/JPY) */
+        .gauge-subtitle {
+            font-size: 18px; /* Is number ko badhakar size adjust karein (e.g., 16px, 18px) */
+            font-weight: 500; /* Thoda bold karne ke liye */
+            margin-top: 5px;  /* Percentage se thoda gap dene ke liye */
+            color: #888;      /* Color agar change karna ho */
+        }
+        .gauge-label {
+            font-size: 0.7rem;
+            color: #7a8b9e;
+            margin-top: 2px;
+        }
+
+        /* Volume Text */
+        .volume-label {
+            font-size: 0.9rem;
+            letter-spacing: 1px;
+            color: #a0aab5;
+            margin-bottom: 20px;
+        }
+
+        /* --- Turn On Button --- */
+        .action-btn {
+            background: linear-gradient(180deg, #00c3ff 0%, #0088cc 100%);
+            border: none;
+            width: 160px;
+            height: 50px;
+            border-radius: 25px;
+            color: white;
+            font-size: 1rem;
+            font-weight: bold;
+            cursor: pointer;
+            /* Idle Blue Glow */
+            box-shadow: 0 0 20px rgba(0, 195, 255, 0.5);
+            transition: transform 0.1s, box-shadow 0.3s, background 0.3s, color 0.3s;
+            margin-bottom: 30px;
+            text-transform: uppercase;
+        }
+
+        .action-btn:active {
+            transform: scale(0.95);
+        }
+
+        .action-btn.on {
+            background: linear-gradient(180deg, #00ff41 0%, #00aa2c 100%);
+            /* Intense Green Neon */
+            box-shadow: 0 0 25px rgba(0, 255, 65, 0.8),
+                        0 0 50px rgba(0, 255, 65, 0.4);
+            text-shadow: 0 0 5px white;
+        }
+
+        .footer-logo {
+            width: 60px;            /* Iska size wapas chhota kiya */
+            opacity: 0.5;
+            margin-top: 20px;        /* Thoda gap diya */
+        }
+
+        /* Animations */
+        @keyframes rotateRadar {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* --- Dynamic Classes for Seller Mode (Red Neon) --- */
+        /* Container Border & Shadow */
+        .mode-sell {
+             border-color: rgba(255, 51, 51, 0.5);
+             box-shadow: 0 0 30px rgba(255, 51, 51, 0.2);
+        }
+
+        /* Percentage Text */
+        .mode-sell .percentage {
+            color: #ff3333;
+            text-shadow: 0 0 20px rgba(255, 51, 51, 0.9);
+        }
+
+        /* Radar Sweep */
+        .mode-sell .radar-sweep {
+            background: conic-gradient(from 0deg, transparent 0%, rgba(255, 51, 51, 0.1) 80%, rgba(255, 51, 51, 0.8) 100%);
+            filter: drop-shadow(0 0 5px #ff3333);
+        }
+
+        /* Currency Box Border & Glow */
+        .mode-sell .currency-box {
+            border-color: #ff3333;
+            box-shadow: 0 0 15px rgba(255, 51, 51, 0.4), inset 0 0 10px rgba(255, 51, 51, 0.1);
+        }
+
+        /* --- NEW: Text Glow for Seller Mode --- */
+        .mode-sell #current-pair {
+            color: #ff3333; /* Neon Red Color */
+            /* Neon Red Glow */
+            text-shadow: 0 0 5px rgba(255, 51, 51, 0.9),
+                         0 0 10px rgba(255, 51, 51, 0.7),
+                         0 0 20px rgba(255, 51, 51, 0.5);
+        }
+        /* -------------------------------------- */
+
+        /* Status Dot */
+        .mode-sell .status-dot {
+            background-color: #ff3333;
+            box-shadow: 0 0 10px #ff3333, 0 0 20px #ff3333;
+        }
+
+        /* Logo Text */
+        .mode-sell .logo-text {
+            color: #ff3333;
+            text-shadow: 0 0 10px rgba(255, 51, 51, 0.8), 0 0 20px rgba(255, 51, 51, 0.4);
+        }
+
+        /* Logo Image Glow */
+        .mode-sell .logo-area img,
+        .mode-sell .gauge-img {
+            filter: drop-shadow(0 0 8px #ff3333);
+        }
+
+        /* --- Green Dot Logic --- */
+        /* Jab Active class lagegi tab color Green hoga */
+        .status-dot.active {
+            background-color: #00ff88 !important; /* Neon Green */
+            box-shadow: 0 0 10px #00ff88, 0 0 20px #00ff88 !important; /* Green Glow */
+        }
+
+        /* --- INTERACTIVE ZONES (Yahan click kaam karega) --- */
+        .currency-box,
+        .currency-dropdown,
+        .currency-option,
+        .gauge-wrapper,
+        .action-btn,
+        .logo-area,
+        input {
+            -webkit-app-region: no-drag;  /* Drag disable kiya */
+            cursor: pointer;              /* Hand icon wapas laye */
+        }
+    </style>
+</head>
+<body>
+
+    <div id="bot-container">
+        <div class="header">
+            <div class="logo-area" id="drag-handle">
+                <img src="bg-logo.png" alt="Logo"> <span class="logo-text">SPHINX</span>
+            </div>
+            <div class="user-email">*********@gmail.com</div>
+        </div>
+
+        <div class="currency-box" id="currency-trigger" tabindex="0">
+            <div class="selected-value" style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+                <span id="current-pair">EUR/JPY (OTC)</span>
+                
+                <div style="display: flex; align-items: center; gap: 5px;">
+                    <span style="font-size: 0.7rem; color: #aaa;">Active</span>
+                    <div class="status-dot"></div>
+                </div>
+            </div>
+
+            <div class="currency-dropdown" id="currency-list">
+                <div class="currency-option">EUR/JPY (OTC)</div>
+                <div class="currency-option">EUR/USD (OTC)</div>
+                <div class="currency-option">GBP/USD (OTC)</div>
+                <div class="currency-option">USD/INR (OTC)</div>
+                <div class="currency-option">AUD/CAD (OTC)</div>
+                <div class="currency-option">USD/BRL (OTC)</div>
+                <div class="currency-option">USD/NZD (OTC)</div>
+            </div>
+        </div>
+
+        <div class="gauge-wrapper" id="gauge-switch">
+            <div class="gauge-track"></div>
+            <div class="radar-sweep" id="radar"></div> 
+            <div class="gauge-inner">
+                <img src="bg-logo.png" class="gauge-img">
+                <span class="percentage" id="percent-val">0.0%</span>
+                <span class="gauge-label" id="gauge-text">EUR/JPY (OTC)</span>
+            </div>
+        </div>
+
+        <div class="volume-label">VOLUME FREQUENCY</div>
+
+        <button class="action-btn" id="power-btn">TURN ON</button>
+
+        
+        
+    </div>
+
+<script src="t2.js" defer></script>
+</body>
+</html>
